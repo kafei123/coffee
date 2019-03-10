@@ -262,8 +262,6 @@ class Query
          * ])
          */
 
-        $param = func_get_args();
-
         $where = $this->queryWhere->parseWhereExp($field, $op, $condition);
 
         if (empty($where)) {

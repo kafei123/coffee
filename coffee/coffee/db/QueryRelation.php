@@ -50,7 +50,7 @@ class QueryRelation
      */
     public static function join(Query $query, $type = '', array $config = []) 
     { 
-        $join = '';
+        $join = [];
 
         // 获取关联的主表的名字
         $table = $query->table;
@@ -66,7 +66,7 @@ class QueryRelation
             case 'joinOne':
                 // 判断是否要求使用join关联
                 if ($config['is_join'] === true) { 
-                    $join = self::joinOneJoin($table, $config['config']);
+                    $join['join'] = self::joinOneJoin($config['config']);
                 }
                 break;
             
@@ -74,6 +74,8 @@ class QueryRelation
                 # code...
                 break;
         }
+
+        var_dump($join);
 
         return $query;
     }
@@ -86,10 +88,10 @@ class QueryRelation
      * @param  array $config 关联条件
      * @return string
      */
-    public static function joinOneJoin($table = '', array $config = []) 
+    public static function joinOneJoin(array $config = []) 
     { 
         $queryJoin = QueryJoin::getInstance();
 
-        $join = $queryJoin->join($table, $config);
+        return $queryJoin->join($config);
     }
 }

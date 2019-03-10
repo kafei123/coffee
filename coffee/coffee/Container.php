@@ -8,6 +8,9 @@
 namespace coffee;
 
 use ReflectionClass;
+use ReflectionException;
+use ReflectionFunction;
+use ReflectionMethod;
 
 class Container
 {
@@ -33,7 +36,9 @@ class Container
     protected $bind = [
         'app'               => App::class,
         'config'            => Config::class,
-        'route'             => Route::class
+        'route'             => Route::class,
+        'log'               => Log::class,
+        'request'           => Request::class
     ];
 
     /**
@@ -94,7 +99,6 @@ class Container
      */
     public static function set ($abstract, $concrete = null)
     {
-        var_dump($abstract);
         return static::getInstance()->bindTo($abstract, $concrete);
     }
 
@@ -120,8 +124,6 @@ class Container
         } else {
             $this->bind[$abstract] = $concrete;
         }
-
-        var_dump($this->bind);
 
         return $this;
     }
@@ -210,7 +212,7 @@ class Container
             // 判断是否存在__make方法
             if ($reflect->hasMethod('__make')) {
                 // 存在，则实例化__make方法
-                $method = new ReflectionClass($class, '__make');
+                $method = new ReflectionMethod($class, '__make');
 
                 if ($method->isPublic() && $method->isStatic()) {
                     $args = $this->bindParams($method, $vars);
@@ -228,7 +230,7 @@ class Container
             return $reflect->newInstanceArgs($args);
 
         } catch (Exception $e) {
-            echo 'Message: ' .$e->getMessage();
+            throw new Exception('class not find: ' . $class);
         }
     }
 
@@ -258,6 +260,7 @@ class Container
             $class      = $param->getClass();
 
             if ($class) {
+                var_dump($class->getName());
                 $args[] = $this->getObjectParam($class->getName(), $vars);
             } elseif (1 == $type && !empty($vars)) {
                 $args[] = array_shift($vars);
@@ -268,10 +271,46 @@ class Container
             } elseif ($param->isDefaultValueAvailable()) {
                 $args[] = $param->getDefaultValue();
             } else {
-                echo 'method param miss:' . $name;
+                throw new Exception('method param miss:' . $name);
+                
             }
         }
 
         return $args;
+    }
+
+    
+
+    /**
+     * 获取对象类型的参数值
+     * 
+     * @access protected
+     * @param  string   $className  类名
+     * @param  array    $vars       参数
+     * @return mixed
+     */
+    protected function getObjectParam($className, &$vars)
+    {
+        $array = $vars;
+        $value = array_shift($array);
+
+        if ($value instanceof $className) {
+            $result = $value;
+            array_shift($vars);
+        } else {
+            $result = $this->make($className);
+        }
+
+        return $result;
+    }
+
+    public function __set($name, $value)
+    {
+        $this->bindTo($name, $value);
+    }
+
+    public function __get($name)
+    {
+        return $this->make($name);
     }
 }

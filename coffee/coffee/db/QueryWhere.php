@@ -67,6 +67,8 @@ class QueryWhere
         return self::$instance;
     }
 
+
+
     /**
      * 分析查询语句
      * 
@@ -101,6 +103,7 @@ class QueryWhere
             // 数组
             foreach ($field as $key => $value) { 
                 if (is_array($value) && count($value) == 2) { 
+                    var_dump($value);
                     // 表达式查询
                     $where[] = $this->getWhereExpression($key, $value[0], $value[1]);
                 } else if (is_string($value) || is_numeric($value)) { 

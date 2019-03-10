@@ -21,7 +21,7 @@
 
 namespace coffee\db\relation;
 
-use coffee\db\QueryWhere;
+use coffee\db\relation\JoinOperation;
 
 class QueryJoin
 {
@@ -72,7 +72,9 @@ class QueryJoin
      * @access private
      */
     private function __construct () 
-    {}
+    { 
+        $this->queryOperation = new QueryOperation();
+    }
 
     /**
      * 私有克隆函数，防止外办克隆对象
@@ -106,120 +108,47 @@ class QueryJoin
      * @param  array $configs 关联条件
      * @return Query
      */
-    public function join($primary_table, array $configs = []) 
+    public function join(array $configs = []) 
     { 
         // 遍历数组
-        foreach ($configs as $config) { 
+        foreach ($configs as &$config) { 
 
             // 如果参数不合法，直接返回
             if (empty($config['table']) || empty($config['primary_key']) || empty($config['foreign_key'])) { 
                 continue;
             }
+            
+            $config['is_join'] = true;
 
-            $this->table_name = $config['table'];
-
-            // 判断是否存在别名
-            if (!empty($config['alias'])) { 
-                $this->table_name = $config['alias'];
-            }
-
-            $join = 'left join';
+            $config['join'] = 'LEFT JOIN';
 
             // 更新规则
             $config = array_merge($this->config, $config);
 
             // 判断关联类型
             if ($config['type'] == 'right') { 
-                $join = 'right join';
+                $config['join'] = 'RIGHT JOIN';
             } else if ($config['type'] == 'inner') { 
-                $join = 'inner join';
+                $config['join'] = 'INNER JOIN';
             }
 
             // 判断是否有查询条件
             if (!empty($config['where'])) { 
-                $this->joinWhere();
+                $config['where']['AND'] = $this->queryOperation->where($config['where']);
             }
 
             // 筛选字段
             if (!empty($config['field'])) { 
-                $this->joinField($config['field']);
+                $config['field'] = $this->queryOperation->field($config['field']);
             }
 
             // 排序条件
             if (!empty($config['order'])) { 
-                $this->joinOrder($config['order']);
+                $config['order'] = $this->queryOperation->order($config['order']);
             }
         }
+
         var_dump($configs);
-    }
-
-    /**
-     * 设置where条件
-     * 
-     * @access public
-     * @param  string|array     $orders 排序条件集
-     * @return void
-     */
-    public function joinWhere($orders = '')
-    {
-        if (is_string($orders)) { 
-            $this->options['order'] = $orders;
-        } else if (is_array($orders)) { 
-            $ordersString = '';
-            // 循环
-            foreach ($orders as $field => $op) { 
-                if ($op == 'desc' || $op == 'asc') { 
-                    $ordersString .= ' `' . $field . '` ' . $op . ', ';
-                }
-            }
-            $this->options['order'] = $ordersString;
-        }
-    }
-
-    /**
-     * join关联 字段筛选
-     * 
-     * @access public
-     * @param  string|array $field 字段筛选
-     * @return string
-     */
-    public function joinField($fields = '') 
-    {   
-        if (is_array($fields)) { 
-            foreach ($fields as &$field) { 
-                $field = '`' . $this->table_name . '`.`' . $field . '`';
-            }
-        } else if (is_string($fields)) {
-            $fields = explode(',', $fields);
-
-            foreach ($fields as &$field) { 
-                $field = '`' . $this->table_name . '`.`' . $field . '`';
-            }
-        }
-
-        $this->options['field'] = implode(',', $fields);
-    }
-
-    /**
-     * 设置order条件
-     * 
-     * @access public
-     * @param  string|array     $orders 排序条件集
-     * @return void
-     */
-    public function joinOrder($orders = '')
-    {
-        if (is_string($orders)) { 
-            $this->options['order'] = $orders;
-        } else if (is_array($orders)) { 
-            $ordersString = '';
-            // 循环
-            foreach ($orders as $field => $op) { 
-                if ($op == 'desc' || $op == 'asc') { 
-                    $ordersString .= ' `' . $field . '` ' . $op . ', ';
-                }
-            }
-            $this->options['order'] = $ordersString;
-        }
+        return $configs;
     }
 }

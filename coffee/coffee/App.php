@@ -173,23 +173,34 @@ class App extends Container
         $this->runtimePath = $this->rootPath . 'runtime' . DIRECTORY_SEPARATOR;
         $this->routePath   = $this->rootPath . 'route' . DIRECTORY_SEPARATOR;
         $this->configPath  = $this->rootPath . 'config' . DIRECTORY_SEPARATOR;
+        $this->configExt   = '.php';
 
         static::setInstance($this);
 
         $this->instance('app', $this);
 
-        // 加载配置文件
-        $this->loadConfig();
+        // 初始化配置
+        $this->config->init();
+    }
+
+    /**
+     * 执行应用程序
+     * @access public
+     * @return Response
+     * @throws Exception
+     */
+    public function run()
+    {
+        // 初始化应用
+        $this->initialize();
 
         // 进行路由解析
         $this->routeParsing();
 
-        // 根据模块更新配置文件
-        $this->updateConfig();
+        // 根据当前的路由模块，更新配置
+        $this->config->updateConfig();
 
-        var_dump($this->config['app']['app_debug']);
-
-        if (!$this->config['app']['app_debug']) {
+        if (!$this->config->get('app.app_debug')) {
             // ini_set('display_errors', 'Off');
         } elseif (PHP_SAPI != 'cli') {
             //重新申请一块比较大的buffer
@@ -203,22 +214,10 @@ class App extends Container
         }
 
         // 数据库配置初始化
-        Db::init($this->config['database']);
+        Db::init($this->config->get('database.'));
 
-        // 分发请求
+        // 访问数据
         $this->distributionRequest();
-    }
-
-    /**
-     * 执行应用程序
-     * @access public
-     * @return Response
-     * @throws Exception
-     */
-    public function run()
-    {
-        // 初始化应用
-        $this->initialize();
     }
 
     /**
@@ -230,105 +229,58 @@ class App extends Container
      */
     public function routeParsing()
     {
-        // 获取变量
-        $params = $_REQUEST;
+        // 获取Request参数
+        $routeParam = $this->request->getRoute();
 
-        // 获取模块数据
-        $module = isset($params['m']) ? $params['m'] : $this->config['app']['default_module'];
-        $controller = isset($params['c']) ? $params['c'] : $this->config['app']['default_controller'];
-        $action = isset($params['a']) ? $params['a'] : $this->config['app']['default_action'];
+        // 获取当前请求类型
+        $method = $this->request->getMethod();
 
-        // 控制器首字母大写
-        $controller = ucwords($controller);
+        // 初始化路由
+        $route = $this->route->init($routeParam, $method);
 
-        // 保存到变量中
-        define('MODULE_NAME', $module);
-        define('CONTROLLER_NAME', $controller);
-        define('ACTION_NAME', $action);
+        // 解析控制器
+        $this->analysisRouteAction($route);
     }
 
     /**
-     * 加载配置文件
+     * 进行路由解析
      * 
      * @access public
+     * @param string $route 路由规则
      * @return Response
      * @throws Exception
      */
-    public function loadConfig()
-    {
-        // 先加载配置文件
-        $this->config = include $this->coffeePath . '/coffee/convention.php';
+    public function analysisRouteAction($route)
+    { 
+        // 初始化
+        $module = $this->config->get('app.default_module');
+        $controller = $this->config->get('app.default_controller');
+        $action = $this->config->get('app.default_action');
 
-        // 获取公共配置目录下的配置信息
-        $this->getConfigInfo($this->configPath);
-    }
+        // 判断
+        if (strpos($route, '/') === false) { 
+            // 直接是方法
+            $action = $route;
+        } else { 
+            // 解析数组
+            $classs = explode('/', $route);
 
-    /**
-     * 获取配置信息
-     * 
-     * @access public
-     * @return bool
-     */
-    public function getConfigInfo($configPath = '')
-    {
-        if ($configPath === '') {
-            $configPath = $this->configPath;
-        }
-
-        // 初始化配置目录下的配置信息数组
-        $configPathInfo = [];
-
-        // 判断是否存在该目录
-        if (is_dir($configPath)) {
-            // 打开目录
-            $configdirs = opendir($configPath);
-
-            if ($configdirs) {
-                // 遍历文件夹
-                while (($file = readdir($configdirs)) !== false) {
-                    // 转换成utf-8格式
-                    $filepath = iconv('GBK', 'utf-8', $configPath . $file);
-
-                    if (!is_dir($filepath)) {
-                        // 去除后缀，获取文件名
-                        $filename = substr($file, 0, strpos($file, '.'));
-                        // 将数据返回数组中
-                        $configPathInfo[$filename] = include_once($filepath);
-                    }
-                }
-            }
-
-            // 合并两个数组
-            if (!empty($configPathInfo)) {
-                // 循环遍历合并
-                foreach ($configPathInfo as $key => $configs) {
-                    if (isset($this->config[$key])) {
-                        $this->config[$key] = array_merge($this->config[$key], $configs);
-                    } else {
-                        $this->config[$key] = $configs;
-                    }
-                }
+            // 判断数组长度
+            if (count($classs) == 2) { 
+                // 指定控制器和方法
+                $controller = $classs[0];
+                $action = $classs[1];
+            } else if (count($classs) > 2) { 
+                $module = $classs[0];
+                $controller = $classs[1];
+                $action = $classs[2];
             }
         }
-    }
 
-    /**
-     * 根据模块更新数据文件
-     * 
-     * @access public
-     * @return bool
-     */
-    public function updateConfig()
-    {
-        if (defined('MODULE_NAME')) {
-            // 获取指定模块下的路径文件
-            $configPath = $this->rootPath . 'application' . DIRECTORY_SEPARATOR . MODULE_NAME . DIRECTORY_SEPARATOR . 'config' . DIRECTORY_SEPARATOR;
-
-            // 更新配置信息
-            $this->getConfigInfo($configPath);
-        }
-
-        return true;
+        // 定义常量
+        define('MODULE_NAME', $module);
+        define('CONTROLLER_NAME', ucfirst($controller));
+        define('ACTION_NAME', $action);
     }
 
     /**
@@ -345,6 +297,17 @@ class App extends Container
         $obj = new $module();
 
         $obj->$action();
+    }
+
+    /**
+     * 获取根目录
+     * 
+     * @access public
+     * @return string
+     */
+    public function getRootPath()
+    {
+        return $this->rootPath;
     }
 
     /**

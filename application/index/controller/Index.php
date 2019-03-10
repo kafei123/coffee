@@ -12,21 +12,44 @@ class Index
         var_dump('index');
 
         Db::connect()->table('users')
-                        ->where('email', '123@qq.com')
-                        ->join([
-                            [
-                                'table'         => 'users',
-                                'primary_key'   => 'id',
-                                'foreign_key'   => 'user_id',
-                                'field'         => 'id,name',
-                                'where'         => [
-                                    'id'        => 1
-                                ],
-                                'type'          => 'leftJoin',
-                                'is_join'       => true
-                            ]
-                        ], true)
-                        ->select();
+            ->where('email', '123@qq.com')
+            ->join([
+                [
+                    'table'         => 'users_money',
+                    'primary_key'   => 'id',
+                    'foreign_key'   => 'user_id',
+                    'field'         => 'id,money',
+                    'where'         => [
+                        'id'        => [
+                            '=' => 1,
+                            'in' => 2
+                        ]
+                    ],
+                    'order'         => [
+                        'created_at' => 'desc'
+                    ],
+                    'type'          => 'leftJoin',
+                    'is_join'       => true
+                ],
+                [
+                    'table'         => 'users_pass',
+                    'primary_key'   => 'id',
+                    'foreign_key'   => 'user_id',
+                    'field'         => 'id,password',
+                    'where'         => [
+                        'id' => [
+                            '=' => 1,
+                            'in' => 2
+                        ]
+                    ],
+                    'order'         => [
+                        'created_at' => 'desc'
+                    ],
+                    'type'          => 'leftJoin',
+                    'is_join'       => true
+                ]
+            ], true)
+            ->select();
 
         var_dump(1);
 
@@ -38,5 +61,10 @@ class Index
     public function config ()
     {
         echo 'config';
+    }
+
+    public function geta ()
+    {
+        echo 'geta';
     }
 }
